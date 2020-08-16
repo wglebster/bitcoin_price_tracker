@@ -1,0 +1,87 @@
+---
+title: "BTC_USD price model"
+output: html_notebook
+---
+
+```{r}
+library(tidyverse)
+library(tsibble)
+library(tsibbledata)
+library(fable)
+```
+```{r}
+coin <- read_csv("data/BTC-USD.csv") %>%
+  as_tsibble()
+coin
+```
+
+```{r}
+coin_close_price_daily <- coin %>%
+  mutate_if(is.character, as.numeric) %>%
+  select(Date, Close) %>%
+  filter_index("2018-01-01" ~ .)
+
+coin_close_price_daily %>%
+  autoplot()
+class(coin_close_price_daily)
+
+```
+```{r}
+model_fit <- coin_close_price_daily %>%
+  model(naive_model = NAIVE(Close),
+        #snaive_model = SNAIVE(Close),
+        #mean_model = MEAN(Close),
+        arima_model = ARIMA(Close)
+  )
+```
+```{r}
+price_forecast <- model_fit %>%
+  forecast(h = "6 months")
+
+price_forecast %>%
+  autoplot(coin_close_price_daily, level = NULL)
+```
+```{r}
+training <- coin_close_price_daily %>%
+  filter_index("2018-01-01" ~ "2020-01-01")
+
+fit_test <- training %>%
+  fabletools::model(naive_model = NAIVE(Close),
+        #snaive_model = SNAIVE(Close),
+        #mean_model = MEAN(Close),
+        arima_model = ARIMA(Close)
+  )
+
+forecast_test <- fit_test %>%
+  fabletools::forecast(h = "6 months")
+
+forecast_test %>%
+  filter(.model == "arima_model") %>%
+  autoplot(training, level = NULL) + 
+  autolayer(filter_index(coin_close_price_daily, "2020-01-01" ~ .), color = "black")
+```
+
+```{r}
+model_accuracy <- fabletools::accuracy(forecast_test, coin_close_price_daily)
+
+model_accuracy %>%
+  select(-.type) %>%
+  arrange(RMSE)
+  
+  #accuracy(coin_training, coin_close_price_daily) %>%
+  #arrange(RMSE)
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
